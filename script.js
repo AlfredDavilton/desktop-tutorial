@@ -1,34 +1,32 @@
 const sheetUrls = [
-  'https://docs.google.com/spreadsheets/d/1Q7ZMOzJ92WS8UgIZdlqDSqKUao6nM79WklYszQQwSmQ/edit?usp=sharing',  // Пример embed-ссылки
-  'https://docs.google.com/spreadsheets/d/1XiKE2moWTC0ulSzEyTKD5sKUIaeTBGPrCH3yOXgHk4M/edit?usp=sharing'
+  'https://docs.google.com/spreadsheets/d/e/2PACX-1vQA0HP72-2NZ7SP6TdIpoKIq_zngFaDIFrAY4gQn2CGHZ7yMpqTp6kjOqLrKpwKbxKuXzw9v8I89R5H/pub?output=tsv'
 ];
+
 
 let currentIndex = 0;
 let slides = [];
 
-function loadAllSheets() {
+async function loadAllSheets() {
   const container = document.getElementById('slider-content');
   container.innerHTML = '';
   slides = [];
 
   for (let i = 0; i < sheetUrls.length; i++) {
+    const data = await loadCSV(sheetUrls[i]);
+    let content;
+
+    if (i === 0) {
+      // первый слайд = таблица
+      content = renderTable(data);
+    } else {
+      // второй слайд = карточка лидера дня
+      content = renderLeaderCard(data);
+    }
+
     const slide = document.createElement('div');
     slide.classList.add('slide');
+    slide.appendChild(content);
 
-    const iframe = document.createElement('iframe');
-    iframe.src = sheetUrls[i] + '&t=' + Date.now();  // Добавляем timestamp для обхода кэша
-    iframe.width = '100%';
-    iframe.height = '6000px';
-    iframe.frameBorder = '0';
-    iframe.allowFullscreen = true;
-    iframe.onload = () => console.log('Iframe loaded for slide ' + i);  // Лог для отладки
-    iframe.onerror = () => {
-      console.error('Iframe failed to load for slide ' + i);
-      // Альтернатива: показать сообщение
-      slide.innerHTML = '<p>Не удалось загрузить файл. <a href="' + sheetUrls[i] + '" target="_blank">Открыть в новой вкладке</a></p>';
-    };
-
-    slide.appendChild(iframe);
     container.appendChild(slide);
     slides.push(slide);
   }
@@ -36,6 +34,33 @@ function loadAllSheets() {
   if (slides.length > 0) {
     showSlide(0);
   }
+}
+
+async function loadCSV(url) {
+  try {
+    const res = await fetch(url + '&t=' + Date.now());
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const rows = text.trim().split(/\r?\n/);
+    return rows.map(r => r.split(/,|;|\t/));
+  } catch (e) {
+    console.error(e);
+    return [['Ошибка загрузки']];
+  }
+}
+
+function renderTable(data) {
+  const tbl = document.createElement('table');
+  data.forEach((row, i) => {
+    const tr = document.createElement('tr');
+    row.forEach(cell => {
+      const el = document.createElement(i === 0 ? 'th' : 'td');
+      el.textContent = cell;
+      tr.appendChild(el);
+    });
+    tbl.appendChild(tr);
+  });
+  return tbl;
 }
 
 function showSlide(index) {
@@ -47,25 +72,4 @@ function showSlide(index) {
   });
   currentIndex = index;
 }
-
-// Кнопки навигации
-document.querySelector('.prev').addEventListener('click', () => {
-  if (slides.length > 0) {
-    showSlide((currentIndex - 1 + slides.length) % slides.length);
-  }
-});
-
-document.querySelector('.next').addEventListener('click', () => {
-  if (slides.length > 0) {
-    showSlide((currentIndex + 1) % slides.length);
-  }
-});
-
-// // Автопереключение
-// setInterval(() => {
-//   if (slides.length > 0) {
-//     showSlide((currentIndex + 1) % slides.length);
-//   }
-// }, 10000);
-
 loadAllSheets();
